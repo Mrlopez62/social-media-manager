@@ -18,6 +18,10 @@
 - Build composer draft UI with media upload and capability checks.
 - Add adapter-level validation rules.
 
+Status:
+- Backend/API scope complete (OAuth, draft persistence, media upload endpoints, capability validation, integration coverage).
+- Frontend composer UI remains a dedicated frontend task track.
+
 ## Phase 3 (Publish + Schedule)
 - Implement `publish-now` and `schedule` transactional flows.
 - Add queue selection + lock semantics for idempotent workers.

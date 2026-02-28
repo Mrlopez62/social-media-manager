@@ -21,26 +21,25 @@ export async function GET() {
 
   const userClient = getSupabaseUserClient(session.accessToken);
   const { data, error } = await userClient
-    .from("social_connections")
-    .select("id, platform, account_id, expires_at, scopes, status, created_at, updated_at")
+    .from("media_assets")
+    .select("id, storage_path, mime_type, size, checksum, created_at")
     .eq("workspace_id", workspaceId)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(200);
 
   if (error) {
-    return fail("CONNECTION_READ_FAILED", error.message, 500);
+    return fail("MEDIA_READ_FAILED", error.message, 500);
   }
 
   return ok({
     workspaceId,
-    items: (data ?? []).map((item) => ({
-      id: item.id,
-      platform: item.platform,
-      accountId: item.account_id,
-      expiresAt: item.expires_at,
-      scopes: item.scopes,
-      status: item.status,
-      createdAt: item.created_at,
-      updatedAt: item.updated_at
+    items: (data ?? []).map((asset) => ({
+      id: asset.id,
+      storagePath: asset.storage_path,
+      mimeType: asset.mime_type,
+      size: asset.size,
+      checksum: asset.checksum,
+      createdAt: asset.created_at
     }))
   });
 }

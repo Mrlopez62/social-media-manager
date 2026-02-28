@@ -12,8 +12,12 @@
 - `POST /api/connections/:platform/oauth/start`
 - `GET /api/connections/:platform/oauth/callback`
 - `DELETE /api/connections/:id`
+- `GET /api/media`
+- `POST /api/media/upload-url`
+- `POST /api/media/complete`
 - `POST /api/posts`
 - `PATCH /api/posts/:id`
+  - Responses include `capabilityWarnings` when adapter-level warnings are produced for selected targets.
 - `POST /api/posts/:id/publish-now`
 - `POST /api/posts/:id/schedule`
 - `GET /api/posts/:id/status`

@@ -3,7 +3,7 @@ import type {
   PlatformAdapter,
   PublishInput,
   PublishResult
-} from "./base";
+} from "./base.ts";
 
 export class TikTokAdapter implements PlatformAdapter {
   readonly platform = "tiktok" as const;
@@ -12,7 +12,7 @@ export class TikTokAdapter implements PlatformAdapter {
     return {
       valid: false,
       warnings: [],
-      errors: ["TikTok connector is deferred to Phase 2."]
+      errors: ["TikTok connector is deferred until Phase 5."]
     };
   }
 
@@ -26,7 +26,7 @@ export class TikTokAdapter implements PlatformAdapter {
     return {
       success: false,
       retryable: false,
-      errorCode: "PHASE_2_CONNECTOR",
+      errorCode: "PHASE_5_CONNECTOR",
       errorMessage: "TikTok publish adapter is intentionally disabled for MVP."
     };
   }

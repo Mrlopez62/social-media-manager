@@ -1,7 +1,7 @@
-import type { Platform } from "../types";
-import type { PlatformAdapter } from "./base";
-import { MetaAdapter } from "./meta";
-import { TikTokAdapter } from "./tiktok";
+import type { Platform } from "../types.ts";
+import type { PlatformAdapter } from "./base.ts";
+import { MetaAdapter } from "./meta.ts";
+import { TikTokAdapter } from "./tiktok.ts";
 
 const adapterRegistry: Record<Platform, PlatformAdapter> = {
   instagram: new MetaAdapter("instagram"),
