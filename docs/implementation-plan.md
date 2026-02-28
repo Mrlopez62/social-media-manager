@@ -28,6 +28,12 @@ Status:
 - Record per-target lifecycle and retry history.
 - Add categorized error mapping + user-safe messages.
 
+Status:
+- Backend/API foundation implemented (queueing routes, dispatch claim, execute lifecycle, status endpoint, retry/backoff).
+- Scheduler trigger foundation added via Edge Function (`supabase/functions/publish_scheduler`).
+- Meta adapter has real publish/refresh foundation wired into worker token handling.
+- Remaining work is product UX and broader adapter capability depth.
+
 ## Phase 4 (Reliability + Security)
 - Add alerting for failure spikes and refresh failures.
 - Add rate limiting, abuse controls, and payload hardening.

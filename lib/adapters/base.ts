@@ -28,6 +28,11 @@ export interface PlatformAdapter {
   validatePayload(input: PublishInput): AdapterValidationResult;
   transformPayload(input: PublishInput): Record<string, unknown>;
   publish(connectionId: string, input: PublishInput): Promise<PublishResult>;
-  refreshToken(connectionId: string): Promise<{ success: boolean; expiresAt?: string; error?: string }>;
+  refreshToken(connectionId: string): Promise<{
+    success: boolean;
+    accessToken?: string;
+    expiresAt?: string;
+    error?: string;
+  }>;
   mapError(error: unknown): { code: string; message: string; retryable: boolean };
 }

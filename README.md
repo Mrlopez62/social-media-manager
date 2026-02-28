@@ -4,7 +4,7 @@ Compose once and publish across connected social platforms.
 
 Current implementation baseline:
 - Platforms: Instagram + Facebook (Meta)
-- Modes: Draft compose + schedule metadata + publish pipeline stubs
+- Modes: Draft compose + schedule + publish job pipeline (queue/dispatch/execute)
 - Hosting posture: Supabase + Vercel
 - TikTok: scaffolded for later phase
 - Draft composer APIs enforce adapter capability validation and store per-target transformed payload + warnings
@@ -33,6 +33,8 @@ Current implementation baseline:
    - `npm run test:integration:db` (requires Supabase DB env vars)
 5. Bootstrap storage bucket/policies:
    - follow [docs/storage-bootstrap.md](docs/storage-bootstrap.md)
+6. Configure scheduled publish runner (optional but recommended):
+   - follow [docs/publish-scheduler.md](docs/publish-scheduler.md)
 
 ## API Surface
 - Auth
@@ -65,7 +67,7 @@ Current implementation baseline:
   - `POST /internal/publish/execute/:jobId`
 
 ## Next Implementation Targets
-1. Implement immediate/scheduled publish execution path in internal worker routes.
-2. Add retry/idempotency mechanics for publish jobs.
-3. Build composer and status UI in `app/` routes.
+1. Build composer and delivery status UI in `app/` routes.
+2. Implement real platform publish calls + token refresh logic in adapters.
+3. Add richer failure recovery UX (manual retry/cancel controls).
 4. Extend capability matrix with deeper platform-specific media constraints and warnings.
