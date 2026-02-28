@@ -42,3 +42,16 @@ export const createWorkspaceSchema = z.object({
 export const selectWorkspaceSchema = z.object({
   workspaceId: z.string().uuid()
 });
+
+export const createMediaUploadUrlSchema = z.object({
+  fileName: z.string().min(1).max(180),
+  mimeType: z.string().min(3).max(120),
+  size: z.number().int().min(1).max(1024 * 1024 * 100)
+});
+
+export const completeMediaUploadSchema = z.object({
+  storagePath: z.string().min(5).max(400),
+  mimeType: z.string().min(3).max(120),
+  size: z.number().int().min(1).max(1024 * 1024 * 100),
+  checksum: z.string().min(8).max(200)
+});

@@ -3,6 +3,7 @@ import type { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getSupabaseAnonClient, getSupabaseUserClient } from "@/lib/supabase";
 import type { WorkspaceRole } from "@/lib/types";
+import { authErrorToStatus, requireRole } from "@/lib/auth/rbac";
 
 export const AUTH_ACCESS_COOKIE = "sm_access_token";
 export const AUTH_REFRESH_COOKIE = "sm_refresh_token";
@@ -120,33 +121,4 @@ export async function getSessionContext(): Promise<SessionContext | null> {
   };
 }
 
-export function requireRole(
-  session: SessionContext | null,
-  allowed: WorkspaceRole[]
-): { allowed: true } | { allowed: false; reason: "UNAUTHENTICATED" | "NO_WORKSPACE" | "FORBIDDEN" } {
-  if (!session) {
-    return { allowed: false, reason: "UNAUTHENTICATED" };
-  }
-
-  if (!session.workspaceId || !session.role) {
-    return { allowed: false, reason: "NO_WORKSPACE" };
-  }
-
-  if (!allowed.includes(session.role)) {
-    return { allowed: false, reason: "FORBIDDEN" };
-  }
-
-  return { allowed: true };
-}
-
-export function authErrorToStatus(reason: "UNAUTHENTICATED" | "NO_WORKSPACE" | "FORBIDDEN") {
-  if (reason === "UNAUTHENTICATED") {
-    return 401;
-  }
-
-  if (reason === "NO_WORKSPACE") {
-    return 409;
-  }
-
-  return 403;
-}
+export { requireRole, authErrorToStatus };

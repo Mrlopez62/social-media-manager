@@ -1,6 +1,6 @@
-import type { Platform } from "../types";
-import { getAdapter } from "../adapters";
-import type { PublishInput, PublishResult } from "../adapters/base";
+import type { Platform } from "../types.ts";
+import { getAdapter } from "../adapters/index.ts";
+import type { PublishInput, PublishResult } from "../adapters/base.ts";
 
 export async function publishToTarget(
   platform: Platform,

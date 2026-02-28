@@ -3,7 +3,7 @@ import type {
   PlatformAdapter,
   PublishInput,
   PublishResult
-} from "./base";
+} from "./base.ts";
 
 const MAX_HASHTAGS = 30;
 
