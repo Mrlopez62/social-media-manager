@@ -28,5 +28,5 @@
 
 ## Known Gaps in Scaffold
 - OAuth exchange + token refresh is stubbed.
-- Actual publish/queue execution is stubbed.
+- Platform adapter publish implementations are scaffolded (queue/worker pipeline is implemented).
 - UI flows are not implemented yet.

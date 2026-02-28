@@ -19,6 +19,7 @@ export type DraftTargetPayload = {
   hashtags: string[];
   location: string | null;
   mediaAssetIds: string[];
+  mediaStoragePaths: string[];
   platformPayload: Record<string, unknown>;
   capabilityWarnings: string[];
 };
@@ -71,6 +72,7 @@ export function buildTargetPayloadsForConnections(params: {
       hashtags: params.canonical.hashtags,
       location: params.canonical.location,
       mediaAssetIds: params.canonical.mediaAssetIds,
+      mediaStoragePaths: params.canonical.mediaStoragePaths,
       platformPayload: transformed,
       capabilityWarnings: validation.warnings
     };

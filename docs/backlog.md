@@ -13,12 +13,14 @@
 - Add DB-backed integration tests for media upload URL generation path + audit persistence. (Done)
 - Add CI job that runs DB integration tests only when DB secrets are present. (Done)
 - Enforce adapter-level capability validation/transform during draft create/edit. (Done)
-- Implement job enqueue + idempotency key for publish/schedule.
+- Implement job enqueue + idempotency key for publish/schedule. (Done)
 
 ## P1
-- Implement dispatcher lock strategy (`for update skip locked`).
-- Implement adapter publish + retry classification.
-- Implement post status aggregation (`published`, `failed`, `partial_failed`).
+- Implement dispatcher lock strategy (`for update skip locked`). (Done)
+- Implement adapter publish + retry classification. (Done)
+- Implement Meta adapter publish + token refresh foundation. (Done)
+- Implement post status aggregation (`published`, `failed`, `partial_failed`). (Done)
+- Add scheduler trigger for dispatch + execute worker flow. (Done)
 - Build composer UI with capability warnings.
 - Build publish timeline and failure retry UX.
 

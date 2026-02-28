@@ -32,7 +32,12 @@ export const schedulePostSchema = z.object({
 
 export const publishDispatchSchema = z.object({
   postId: z.string().uuid().optional(),
-  runAtBefore: z.string().datetime().optional()
+  runAtBefore: z.string().datetime().optional(),
+  limit: z.number().int().min(1).max(100).optional()
+});
+
+export const executePublishJobSchema = z.object({
+  lockToken: z.string().min(8).max(200).optional()
 });
 
 export const createWorkspaceSchema = z.object({

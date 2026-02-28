@@ -25,7 +25,9 @@
 
 ## Internal
 - `POST /internal/publish/dispatch`
+  - Body: `{ postId?: uuid, runAtBefore?: datetime, limit?: number }`
 - `POST /internal/publish/execute/:jobId`
+  - Body: `{ lockToken?: string }`
 
 ## Error Envelope
 ```json

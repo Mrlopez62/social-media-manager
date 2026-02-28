@@ -36,7 +36,6 @@ jobs:
     name: Integration DB
     runs-on: ubuntu-latest
     needs: quality
-    if: ${{ secrets.TEST_SUPABASE_URL != '' && secrets.TEST_SUPABASE_SERVICE_ROLE_KEY != '' }}
     env:
       TEST_SUPABASE_URL: ${{ secrets.TEST_SUPABASE_URL }}
       TEST_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.TEST_SUPABASE_SERVICE_ROLE_KEY }}
@@ -46,14 +45,30 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Resolve DB Test Env Availability
+        id: db_env
+        run: |
+          if [[ -n "${TEST_SUPABASE_URL}" && -n "${TEST_SUPABASE_SERVICE_ROLE_KEY}" ]]; then
+            echo "run_db_tests=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_db_tests=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Skip DB Integration Tests (Missing Secrets)
+        if: ${{ steps.db_env.outputs.run_db_tests != 'true' }}
+        run: echo "Skipping DB integration tests because TEST_SUPABASE_URL/TEST_SUPABASE_SERVICE_ROLE_KEY are not configured."
+
       - name: Setup Node
+        if: ${{ steps.db_env.outputs.run_db_tests == 'true' }}
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
 
       - name: Install Dependencies
+        if: ${{ steps.db_env.outputs.run_db_tests == 'true' }}
         run: npm ci
 
       - name: DB Integration Tests
+        if: ${{ steps.db_env.outputs.run_db_tests == 'true' }}
         run: npm run test:integration:db
