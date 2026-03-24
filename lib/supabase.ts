@@ -1,15 +1,27 @@
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+let hasWarnedMissingPublicEnv = false;
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  // Runtime guard for local/dev misconfiguration.
-  console.warn("Supabase public env vars are missing.");
+function readSupabaseEnv() {
+  return {
+    supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY
+  };
+}
+
+function warnMissingPublicEnvOnce(supabaseUrl?: string, supabaseAnonKey?: string) {
+  if ((!supabaseUrl || !supabaseAnonKey) && !hasWarnedMissingPublicEnv) {
+    // Runtime guard for local/dev misconfiguration.
+    console.warn("Supabase public env vars are missing.");
+    hasWarnedMissingPublicEnv = true;
+  }
 }
 
 export function getSupabaseBrowserClient() {
+  const { supabaseUrl, supabaseAnonKey } = readSupabaseEnv();
+  warnMissingPublicEnvOnce(supabaseUrl, supabaseAnonKey);
+
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY");
   }
@@ -18,6 +30,9 @@ export function getSupabaseBrowserClient() {
 }
 
 export function getSupabaseAnonClient() {
+  const { supabaseUrl, supabaseAnonKey } = readSupabaseEnv();
+  warnMissingPublicEnvOnce(supabaseUrl, supabaseAnonKey);
+
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY");
   }
@@ -31,6 +46,8 @@ export function getSupabaseAnonClient() {
 }
 
 export function getSupabaseServiceClient() {
+  const { supabaseUrl, supabaseServiceRoleKey } = readSupabaseEnv();
+
   if (!supabaseUrl || !supabaseServiceRoleKey) {
     throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY or NEXT_PUBLIC_SUPABASE_URL");
   }
@@ -39,6 +56,9 @@ export function getSupabaseServiceClient() {
 }
 
 export function getSupabaseUserClient(accessToken: string) {
+  const { supabaseUrl, supabaseAnonKey } = readSupabaseEnv();
+  warnMissingPublicEnvOnce(supabaseUrl, supabaseAnonKey);
+
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY");
   }
