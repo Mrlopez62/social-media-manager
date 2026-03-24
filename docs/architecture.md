@@ -18,15 +18,17 @@
 3. User creates draft post and targets one or more connections.
 4. User publishes immediately or schedules a job.
 5. Worker dispatches queued jobs and calls platform adapters.
-6. Per-target status and audit events are persisted for UI + retries.
+6. Per-target status and audit events are persisted for timeline UI + retries.
 
 ## Security Baseline
 - All tenant tables RLS-enabled.
 - Access checks at both API layer and DB layer.
 - Internal execution endpoints require shared token.
 - Provider tokens are stored encrypted (`*_token_enc`) and not returned to client.
+- Write endpoints enforce DB-backed per-scope rate limits.
+- JSON write payloads enforce `Content-Type` and body size guardrails.
 
 ## Known Gaps in Scaffold
 - OAuth exchange + token refresh is stubbed.
 - Platform adapter publish implementations are scaffolded (queue/worker pipeline is implemented).
-- UI flows are not implemented yet.
+- Composer UX remains lightweight and should be expanded.

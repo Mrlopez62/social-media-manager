@@ -1,0 +1,169 @@
+import { readFileSync, existsSync } from "fs";
+import { resolve } from "path";
+
+const ROOT = process.cwd();
+
+function readJson(path) {
+  return JSON.parse(readFileSync(resolve(ROOT, path), "utf8"));
+}
+
+function readText(path) {
+  return readFileSync(resolve(ROOT, path), "utf8");
+}
+
+function isExactVersion(value) {
+  return /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(value);
+}
+
+function collectDependencyPinFailures(packageJson) {
+  const failures = [];
+  const groups = ["dependencies", "devDependencies"];
+
+  for (const group of groups) {
+    const entries = Object.entries(packageJson[group] ?? {});
+    for (const [name, version] of entries) {
+      if (!isExactVersion(version)) {
+        failures.push(`${group}.${name} must be exact (found "${version}").`);
+      }
+    }
+  }
+
+  return failures;
+}
+
+function collectLockfileFailures(packageJson, lockfile) {
+  const failures = [];
+  const rootPackage = lockfile?.packages?.[""];
+
+  if (!rootPackage) {
+    failures.push("package-lock.json missing root packages[\"\"].");
+    return failures;
+  }
+
+  const sections = ["dependencies", "devDependencies"];
+  for (const section of sections) {
+    const expected = packageJson[section] ?? {};
+    const actual = rootPackage[section] ?? {};
+
+    for (const [name, version] of Object.entries(expected)) {
+      if (actual[name] !== version) {
+        failures.push(`package-lock root ${section}.${name} mismatch (expected "${version}", found "${actual[name] ?? "missing"}").`);
+      }
+    }
+  }
+
+  return failures;
+}
+
+const REQUIRED_ALERT_RULE_IDS = [
+  "critical_dead_letter_spike",
+  "warning_publish_failures_increasing",
+  "critical_meta_refresh_failures",
+  "warning_meta_refresh_degradation",
+  "warning_internal_worker_failures",
+  "warning_rate_limit_denial_surge",
+  "critical_rate_limit_denial_flood",
+  "warning_oauth_start_failures"
+];
+
+function collectAlertRoutingFailures(alertRouting) {
+  const failures = [];
+  const channels = alertRouting.channels ?? {};
+  const rules = alertRouting.rules ?? [];
+
+  for (const id of ["ops-slack", "security-slack", "pager"]) {
+    if (!channels[id]) {
+      failures.push(`config/alert-routing.json missing channel "${id}".`);
+    }
+  }
+
+  const rulesById = new Map(rules.map((rule) => [rule.id, rule]));
+  for (const id of REQUIRED_ALERT_RULE_IDS) {
+    if (!rulesById.has(id)) {
+      failures.push(`config/alert-routing.json missing required rule "${id}".`);
+    }
+  }
+
+  for (const rule of rules) {
+    if (!["warning", "critical"].includes(rule.severity)) {
+      failures.push(`alert rule "${rule.id}" has invalid severity "${rule.severity}".`);
+    }
+
+    if (typeof rule.query !== "string" || !rule.query.includes("environment:production")) {
+      failures.push(`alert rule "${rule.id}" must include "environment:production" in query.`);
+    }
+
+    if (!Array.isArray(rule.channels) || rule.channels.length === 0) {
+      failures.push(`alert rule "${rule.id}" must include at least one channel.`);
+      continue;
+    }
+
+    for (const channelId of rule.channels) {
+      if (!channels[channelId]) {
+        failures.push(`alert rule "${rule.id}" references unknown channel "${channelId}".`);
+      }
+    }
+
+    if (rule.severity === "critical" && !rule.channels.includes("pager")) {
+      failures.push(`critical alert rule "${rule.id}" must route to "pager".`);
+    }
+  }
+
+  return failures;
+}
+
+const REQUIRED_INCIDENT_HEADINGS = [
+  "## Objectives",
+  "## Participants And Roles",
+  "## Drill Cadence",
+  "## Pre-Drill Checklist",
+  "## Scenario 1: Dead-Letter Spike",
+  "## Scenario 2: Meta Token Refresh Failure Burst",
+  "## Execution Timeline",
+  "## Evidence Capture Template",
+  "## Exit Criteria",
+  "## Post-Drill Follow-Up"
+];
+
+function collectIncidentDrillFailures(docText) {
+  const failures = [];
+  for (const heading of REQUIRED_INCIDENT_HEADINGS) {
+    if (!docText.includes(heading)) {
+      failures.push(`docs/incident-drill.md missing heading "${heading}".`);
+    }
+  }
+  return failures;
+}
+
+function run() {
+  const failures = [];
+
+  if (!existsSync(resolve(ROOT, "package-lock.json"))) {
+    failures.push("package-lock.json is required.");
+  }
+
+  const packageJson = readJson("package.json");
+  const lockfile = readJson("package-lock.json");
+  const alertRouting = readJson("config/alert-routing.json");
+  const incidentDrillDoc = readText("docs/incident-drill.md");
+
+  failures.push(...collectDependencyPinFailures(packageJson));
+  failures.push(...collectLockfileFailures(packageJson, lockfile));
+  failures.push(...collectAlertRoutingFailures(alertRouting));
+  failures.push(...collectIncidentDrillFailures(incidentDrillDoc));
+
+  if (failures.length > 0) {
+    console.error("Pre-launch checklist failed:");
+    for (const failure of failures) {
+      console.error(`- ${failure}`);
+    }
+    process.exit(1);
+  }
+
+  console.log("Pre-launch checklist passed:");
+  console.log("- dependency pins verified");
+  console.log("- alert routing config verified");
+  console.log("- incident drill document verified");
+}
+
+run();

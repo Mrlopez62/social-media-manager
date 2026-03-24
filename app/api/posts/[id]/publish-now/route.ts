@@ -1,54 +1,57 @@
-import { fail, ok } from "@/lib/api/http";
-import { authErrorToStatus, getSessionContext, requireRole } from "@/lib/auth/session";
-import { PublishJobError, queuePostPublish } from "@/lib/publish/jobs";
+import { getSessionContext } from "@/lib/auth/session";
+import { emitTelemetry } from "@/lib/observability/telemetry";
+import { postPublishNowOperatorHttpRoute } from "@/lib/publish/operator-route-http";
+import { queuePostPublish } from "@/lib/publish/jobs";
+import {
+  enforceRateLimit,
+  normalizeRateLimitResponse,
+  rateLimitPolicies
+} from "@/lib/security/rate-limit";
 import { getSupabaseUserClient } from "@/lib/supabase";
 
 export async function POST(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await getSessionContext();
-  const access = requireRole(session, ["owner", "admin", "editor"]);
-
-  if (!access.allowed) {
-    const message =
-      access.reason === "FORBIDDEN"
-        ? "You do not have permission to publish posts."
-        : access.reason === "NO_WORKSPACE"
-          ? "Join or create a workspace first."
-          : "Authentication is required.";
-
-    return fail(
-      access.reason,
-      message,
-      authErrorToStatus(access.reason)
-    );
-  }
-
-  if (!session?.workspaceId) {
-    return fail("NO_WORKSPACE", "Join or create a workspace first.", 409);
-  }
-
-  const userClient = getSupabaseUserClient(session.accessToken);
   const postId = (await params).id;
 
-  try {
-    const queued = await queuePostPublish({
-      userClient,
-      workspaceId: session.workspaceId,
-      actorUserId: session.userId,
-      postId,
-      mode: "publish_now",
-      runAtIso: new Date().toISOString()
-    });
+  return postPublishNowOperatorHttpRoute({
+    req,
+    postId,
+    deps: {
+      getSessionContext,
+      enforceRateLimit: async ({ req: routeReq, userId }) => {
+        const rateLimited = await enforceRateLimit({
+          req: routeReq,
+          policy: rateLimitPolicies.publishQueue,
+          userId
+        });
 
-    return ok(queued, 202);
-  } catch (error) {
-    if (error instanceof PublishJobError) {
-      return fail(error.code, error.message, error.status);
+        if (!rateLimited) {
+          return null;
+        }
+
+        return normalizeRateLimitResponse(rateLimited);
+      },
+      queuePostPublish: async ({
+        accessToken,
+        workspaceId,
+        actorUserId,
+        postId: routePostId,
+        mode,
+        runAtIso
+      }) =>
+        queuePostPublish({
+          userClient: getSupabaseUserClient(accessToken),
+          workspaceId,
+          actorUserId,
+          postId: routePostId,
+          mode,
+          runAtIso
+        }),
+      emitTelemetry: (payload) => {
+        void emitTelemetry(payload);
+      }
     }
-
-    const message = error instanceof Error ? error.message : "Failed to queue publish-now job.";
-    return fail("PUBLISH_NOW_FAILED", message, 500);
-  }
+  });
 }

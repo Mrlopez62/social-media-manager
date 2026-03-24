@@ -5,7 +5,49 @@ on:
     branches: [main]
   pull_request:
 
+env:
+  DISABLE_RATE_LIMITS: ${{ vars.DISABLE_RATE_LIMITS || 'false' }}
+  RATE_LIMIT_AUTH_LOGIN_MAX: ${{ vars.RATE_LIMIT_AUTH_LOGIN_MAX || '8' }}
+  RATE_LIMIT_AUTH_LOGIN_WINDOW_SECONDS: ${{ vars.RATE_LIMIT_AUTH_LOGIN_WINDOW_SECONDS || '60' }}
+  RATE_LIMIT_AUTH_SIGNUP_MAX: ${{ vars.RATE_LIMIT_AUTH_SIGNUP_MAX || '4' }}
+  RATE_LIMIT_AUTH_SIGNUP_WINDOW_SECONDS: ${{ vars.RATE_LIMIT_AUTH_SIGNUP_WINDOW_SECONDS || '60' }}
+  RATE_LIMIT_OAUTH_START_MAX: ${{ vars.RATE_LIMIT_OAUTH_START_MAX || '12' }}
+  RATE_LIMIT_OAUTH_START_WINDOW_SECONDS: ${{ vars.RATE_LIMIT_OAUTH_START_WINDOW_SECONDS || '60' }}
+  RATE_LIMIT_POST_WRITE_MAX: ${{ vars.RATE_LIMIT_POST_WRITE_MAX || '40' }}
+  RATE_LIMIT_POST_WRITE_WINDOW_SECONDS: ${{ vars.RATE_LIMIT_POST_WRITE_WINDOW_SECONDS || '60' }}
+  RATE_LIMIT_POST_PUBLISH_QUEUE_MAX: ${{ vars.RATE_LIMIT_POST_PUBLISH_QUEUE_MAX || '20' }}
+  RATE_LIMIT_POST_PUBLISH_QUEUE_WINDOW_SECONDS: ${{ vars.RATE_LIMIT_POST_PUBLISH_QUEUE_WINDOW_SECONDS || '60' }}
+  RATE_LIMIT_MEDIA_WRITE_MAX: ${{ vars.RATE_LIMIT_MEDIA_WRITE_MAX || '30' }}
+  RATE_LIMIT_MEDIA_WRITE_WINDOW_SECONDS: ${{ vars.RATE_LIMIT_MEDIA_WRITE_WINDOW_SECONDS || '60' }}
+
 jobs:
+  security:
+    name: Security
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Dependency Audit (Fail on Critical)
+        run: npm audit --audit-level=critical
+
+      - name: Secret Scan (Gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   quality:
     name: Quality
     runs-on: ubuntu-latest
@@ -31,6 +73,30 @@ jobs:
 
       - name: Integration Tests
         run: npm test
+
+  e2e:
+    name: E2E
+    runs-on: ubuntu-latest
+    needs: quality
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Install Playwright Browser
+        run: npx playwright install --with-deps chromium
+
+      - name: E2E Tests
+        run: npm run test:e2e
 
   integration-db:
     name: Integration DB
@@ -72,3 +138,24 @@ jobs:
       - name: DB Integration Tests
         if: ${{ steps.db_env.outputs.run_db_tests == 'true' }}
         run: npm run test:integration:db
+
+  prelaunch-checklist:
+    name: Prelaunch Checklist
+    runs-on: ubuntu-latest
+    needs: [security, quality, e2e, integration-db]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Prelaunch Checklist Automation
+        run: npm run check:prelaunch
