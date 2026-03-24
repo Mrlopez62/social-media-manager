@@ -31,10 +31,18 @@ Current implementation baseline:
    - `npm run typecheck`
    - `npm test`
    - `npm run test:integration:db` (requires Supabase DB env vars)
+   - `npm run test:e2e` (requires Playwright browser install via `npx playwright install chromium`)
 5. Bootstrap storage bucket/policies:
    - follow [docs/storage-bootstrap.md](docs/storage-bootstrap.md)
 6. Configure scheduled publish runner (optional but recommended):
    - follow [docs/publish-scheduler.md](docs/publish-scheduler.md)
+7. Configure security hardening baseline:
+   - follow [docs/security-hardening.md](docs/security-hardening.md)
+8. Configure observability dashboards and alert thresholds:
+   - follow [docs/observability-alerts.md](docs/observability-alerts.md)
+9. Run pre-launch checklist automation:
+   - `npm run check:prelaunch`
+   - review [docs/incident-drill.md](docs/incident-drill.md)
 
 ## API Surface
 - Auth
@@ -60,14 +68,17 @@ Current implementation baseline:
   - `PATCH /api/posts/:id`
   - `POST /api/posts/:id/publish-now`
   - `POST /api/posts/:id/schedule`
+  - `POST /api/posts/:id/cancel`
+  - `POST /api/posts/:id/run-worker`
+  - `POST /api/posts/:id/retry-failed`
   - `GET /api/posts/:id/status`
+  - `GET /api/posts/:id/timeline`
   - `GET /api/posts?status=&platform=&dateRange=`
 - Internal worker
   - `POST /internal/publish/dispatch`
   - `POST /internal/publish/execute/:jobId`
 
 ## Next Implementation Targets
-1. Build composer and delivery status UI in `app/` routes.
-2. Implement real platform publish calls + token refresh logic in adapters.
-3. Add richer failure recovery UX (manual retry/cancel controls).
-4. Extend capability matrix with deeper platform-specific media constraints and warnings.
+1. Implement deeper adapter capability and media-policy constraints per platform.
+2. Add production-grade observability wiring and alert routing verification in live environments.
+3. Expand E2E coverage to include authenticated Meta OAuth callback persistence and full draft create/edit flows.

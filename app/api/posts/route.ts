@@ -2,8 +2,10 @@ import { fail, ok } from "@/lib/api/http";
 import { createPostSchema, platformSchema } from "@/lib/api/schemas";
 import { parseJsonBody } from "@/lib/api/validation";
 import { authErrorToStatus, getSessionContext, requireRole } from "@/lib/auth/session";
+import { emitTelemetry } from "@/lib/observability/telemetry";
 import { DraftServiceError, createDraftPost } from "@/lib/posts/drafts";
 import { getDraftWriteAccessFailure } from "@/lib/posts/draft-rbac";
+import { enforceRateLimit, rateLimitPolicies } from "@/lib/security/rate-limit";
 import { getSupabaseUserClient } from "@/lib/supabase";
 
 const VALID_POST_FILTERS = new Set([
@@ -71,6 +73,15 @@ export async function POST(req: Request) {
     return fail("UNAUTHENTICATED", "Authentication is required.", 401);
   }
 
+  const rateLimited = await enforceRateLimit({
+    req,
+    policy: rateLimitPolicies.postsWrite,
+    userId: session.userId
+  });
+  if (rateLimited) {
+    return rateLimited;
+  }
+
   const workspaceId = session.workspaceId;
   if (!workspaceId) {
     return fail("NO_WORKSPACE", "Join or create a workspace first.", 409);
@@ -88,6 +99,20 @@ export async function POST(req: Request) {
       workspaceId,
       actorUserId: session.userId,
       input: parsed.data
+    });
+
+    void emitTelemetry({
+      event: "api.posts.create.succeeded",
+      level: "info",
+      message: "Draft post created.",
+      tags: {
+        workspaceId,
+        userId: session.userId,
+        postId: created.post.id
+      },
+      data: {
+        targetCount: created.targets.length
+      }
     });
 
     return ok(
@@ -113,10 +138,32 @@ export async function POST(req: Request) {
     );
   } catch (error) {
     if (error instanceof DraftServiceError) {
+      void emitTelemetry({
+        event: "api.posts.create.failed",
+        level: "warning",
+        message: "Draft post creation failed.",
+        tags: {
+          workspaceId,
+          userId: session.userId,
+          errorCode: error.code
+        },
+        error
+      });
       return fail(error.code, error.message, error.status);
     }
 
     const message = error instanceof Error ? error.message : "Failed to create draft post.";
+    void emitTelemetry({
+      event: "api.posts.create.failed",
+      level: "error",
+      message: "Draft post creation failed with unexpected error.",
+      tags: {
+        workspaceId,
+        userId: session.userId,
+        errorCode: "POST_CREATE_FAILED"
+      },
+      error
+    });
     return fail("POST_CREATE_FAILED", message, 500);
   }
 }

@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import { getAdapter } from "../adapters/index.ts";
 import type { PublishInput } from "../adapters/base.ts";
+import { emitTelemetry } from "../observability/telemetry.ts";
 import { decryptSecret, encryptSecret } from "../security/encryption.ts";
 import {
   aggregatePostDeliveryStatus,
@@ -165,6 +166,22 @@ export async function claimQueuedPublishJobs(params: {
 
   const claimed = (data ?? []) as ClaimedJobRow[];
 
+  if (claimed.length > 0) {
+    void emitTelemetry({
+      event: "publish.dispatch.claimed",
+      level: "info",
+      message: "Dispatcher claimed queued publish jobs.",
+      tags: {
+        postId: params.postId ?? "all"
+      },
+      data: {
+        claimedCount: claimed.length,
+        runAtBefore: runBeforeIso,
+        limit
+      }
+    });
+  }
+
   return {
     claimedCount: claimed.length,
     lockToken: dispatcherLockToken,
@@ -180,6 +197,32 @@ export async function claimQueuedPublishJobs(params: {
       idempotencyKey: job.idempotency_key
     }))
   };
+}
+
+function emitTargetFailureTelemetry(params: {
+  postId: string;
+  workspaceId: string;
+  target: PostTargetRow;
+  errorCode: string;
+  errorMessage: string;
+  retryable: boolean;
+}) {
+  void emitTelemetry({
+    event: "publish.target.failed",
+    level: params.retryable ? "warning" : "error",
+    message: "Publish target failed.",
+    tags: {
+      workspaceId: params.workspaceId,
+      postId: params.postId,
+      targetId: params.target.id,
+      platform: params.target.platform,
+      errorCode: params.errorCode,
+      retryable: params.retryable
+    },
+    data: {
+      errorMessage: params.errorMessage
+    }
+  });
 }
 
 async function readJobById(serviceClient: ServiceClientLike, jobId: string) {
@@ -420,6 +463,21 @@ export async function executeQueuedPublishJob(params: {
   await updateJobState(serviceClient, executionJob.id, { attempt: nextAttempt });
 
   const post = await readPostForJob(serviceClient, executionJob.post_id);
+  void emitTelemetry({
+    event: "publish.job.execute.started",
+    level: "info",
+    message: "Publish job execution started.",
+    tags: {
+      workspaceId: post.workspace_id,
+      postId: executionJob.post_id,
+      jobId: executionJob.id
+    },
+    data: {
+      attempt: nextAttempt,
+      maxAttempts: executionJob.max_attempts
+    }
+  });
+
   await markPostStatus(serviceClient, post.id, "publishing");
 
   const targets = await readTargetsForJob(serviceClient, executionJob.post_id);
@@ -433,6 +491,18 @@ export async function executeQueuedPublishJob(params: {
     });
 
     await markPostStatus(serviceClient, post.id, "failed");
+
+    void emitTelemetry({
+      event: "publish.job.dead_lettered",
+      level: "error",
+      message: "Publish job dead-lettered because post has no targets.",
+      tags: {
+        workspaceId: post.workspace_id,
+        postId: executionJob.post_id,
+        jobId: executionJob.id,
+        errorCode: "POST_TARGETS_REQUIRED"
+      }
+    });
 
     return {
       jobId: executionJob.id,
@@ -475,6 +545,14 @@ export async function executeQueuedPublishJob(params: {
         errorMessage: "Connection is missing for this publish target.",
         attemptedAt
       });
+      emitTargetFailureTelemetry({
+        workspaceId: post.workspace_id,
+        postId: executionJob.post_id,
+        target,
+        errorCode: "CONNECTION_NOT_FOUND",
+        errorMessage: "Connection is missing for this publish target.",
+        retryable: false
+      });
       continue;
     }
 
@@ -491,6 +569,14 @@ export async function executeQueuedPublishJob(params: {
         errorMessage: "Connection is inactive. Reconnect the account to continue publishing.",
         attemptedAt
       });
+      emitTargetFailureTelemetry({
+        workspaceId: post.workspace_id,
+        postId: executionJob.post_id,
+        target,
+        errorCode: "CONNECTION_INACTIVE",
+        errorMessage: "Connection is inactive. Reconnect the account to continue publishing.",
+        retryable: false
+      });
       continue;
     }
 
@@ -506,6 +592,14 @@ export async function executeQueuedPublishJob(params: {
         errorCode: "CONNECTION_PLATFORM_MISMATCH",
         errorMessage: "Selected connection platform does not match publish target.",
         attemptedAt
+      });
+      emitTargetFailureTelemetry({
+        workspaceId: post.workspace_id,
+        postId: executionJob.post_id,
+        target,
+        errorCode: "CONNECTION_PLATFORM_MISMATCH",
+        errorMessage: "Selected connection platform does not match publish target.",
+        retryable: false
       });
       continue;
     }
@@ -528,6 +622,14 @@ export async function executeQueuedPublishJob(params: {
         errorCode: "CONNECTION_TOKEN_INVALID",
         errorMessage: "Stored connection token is invalid. Reconnect the account.",
         attemptedAt
+      });
+      emitTargetFailureTelemetry({
+        workspaceId: post.workspace_id,
+        postId: executionJob.post_id,
+        target,
+        errorCode: "CONNECTION_TOKEN_INVALID",
+        errorMessage: "Stored connection token is invalid. Reconnect the account.",
+        retryable: false
       });
       continue;
     }
@@ -555,6 +657,14 @@ export async function executeQueuedPublishJob(params: {
           errorCode: "META_TOKEN_REFRESH_FAILED",
           errorMessage: "Connection token refresh failed. Retrying.",
           attemptedAt
+        });
+        emitTargetFailureTelemetry({
+          workspaceId: post.workspace_id,
+          postId: executionJob.post_id,
+          target,
+          errorCode: "META_TOKEN_REFRESH_FAILED",
+          errorMessage: "Connection token refresh failed. Retrying.",
+          retryable: true
         });
         continue;
       }
@@ -621,6 +731,14 @@ export async function executeQueuedPublishJob(params: {
       errorMessage: failure.userMessage,
       attemptedAt
     });
+    emitTargetFailureTelemetry({
+      workspaceId: post.workspace_id,
+      postId: executionJob.post_id,
+      target,
+      errorCode: failure.code,
+      errorMessage: failure.userMessage,
+      retryable: failure.retryable
+    });
   }
 
   const refreshedTargets = await readTargetsForJob(serviceClient, executionJob.post_id);
@@ -667,6 +785,30 @@ export async function executeQueuedPublishJob(params: {
     }
   });
 
+  const telemetryLevel =
+    finalJobStatus === "succeeded" ? "info" : finalJobStatus === "queued" ? "warning" : "error";
+  void emitTelemetry({
+    event: "publish.job.execute.finished",
+    level: telemetryLevel,
+    message: "Publish job execution finished.",
+    tags: {
+      workspaceId: post.workspace_id,
+      postId: executionJob.post_id,
+      jobId: executionJob.id,
+      finalJobStatus,
+      aggregatePostStatus,
+      errorCode: failureCodes[0] ?? undefined
+    },
+    data: {
+      attempt: nextAttempt,
+      maxAttempts: executionJob.max_attempts,
+      attemptedTargets: actionableTargets.length,
+      publishedTargets: publishedCount,
+      failedTargets: failedCount,
+      retryableFailures
+    }
+  });
+
   return {
     jobId: executionJob.id,
     postId: executionJob.post_id,
@@ -679,5 +821,39 @@ export async function executeQueuedPublishJob(params: {
       failedTargets: failedCount,
       retryableFailures
     }
+  };
+}
+
+export async function dispatchAndExecutePostJobs(params: {
+  serviceClient: unknown;
+  postId: string;
+  runAtBefore?: string;
+  limit?: number;
+}) {
+  const claimed = await claimQueuedPublishJobs({
+    serviceClient: params.serviceClient,
+    postId: params.postId,
+    runAtBefore: params.runAtBefore,
+    limit: params.limit
+  });
+
+  const executions: Array<Awaited<ReturnType<typeof executeQueuedPublishJob>>> = [];
+
+  for (const job of claimed.jobs) {
+    const execution = await executeQueuedPublishJob({
+      serviceClient: params.serviceClient,
+      jobId: job.id,
+      lockToken: claimed.lockToken
+    });
+    executions.push(execution);
+  }
+
+  return {
+    postId: params.postId,
+    claimedCount: claimed.claimedCount,
+    lockToken: claimed.lockToken,
+    claimedJobs: claimed.jobs,
+    executedCount: executions.length,
+    executions
   };
 }

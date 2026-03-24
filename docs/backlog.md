@@ -21,10 +21,23 @@
 - Implement Meta adapter publish + token refresh foundation. (Done)
 - Implement post status aggregation (`published`, `failed`, `partial_failed`). (Done)
 - Add scheduler trigger for dispatch + execute worker flow. (Done)
-- Build composer UI with capability warnings.
-- Build publish timeline and failure retry UX.
+- Build publish timeline and failure retry UX. (Done)
+- Build composer UI with capability warnings. (Done)
+- Add cancel controls for queued publish jobs in delivery UX. (Done)
+- Harden cancel semantics for mixed-target retry queues and unsupported-state guidance. (Done)
+- Add manual worker dispatch/execute operator controls in delivery UX. (Done)
+- Add route-level integration coverage for run-worker operator path (auth, validation, orchestration). (Done)
+- Add route-level integration coverage for publish operators (`publish-now`, `schedule`, `cancel`, `retry-failed`). (Done)
+- Add HTTP response-shape integration coverage for publish operator wrappers (`{data}` / `{error}` envelopes + status mapping). (Done)
+- Add HTTP response-shape integration coverage for run-worker wrapper and post read routes (`status`, `timeline`). (Done)
+- Add dashboard action-client integration coverage for operator actions with posts/status/timeline refresh sequencing. (Done)
+- Add Playwright E2E coverage for dashboard publish and run-worker refresh flows. (Done)
+- Expand Playwright E2E coverage to composer OAuth connect/disconnect and media upload flow. (Done)
 
 ## P2
-- Add security checks (rate limits, abuse rules, content-size limits).
-- Add operational dashboards and alerts.
+- Add security checks (rate limits + JSON payload hardening baseline). (Done)
+- Add operational dashboards and alerts. (In Progress - Sentry query/threshold catalog documented)
+- Add CI security scan gates (dependency audit + secret scanning). (Done)
+- Add security control tests for `415`/`413` payload guards and `429` rate-limit enforcement. (Done)
+- Automate pre-launch checklist (dependency pin review, alert routing validation, incident drill runbook checks). (Done)
 - Add TikTok adapter with feature flags.

@@ -19,7 +19,7 @@ type OAuthStateRow = {
 
 export async function GET(
   req: Request,
-  { params }: { params: Promise<{ platform: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getSessionContext();
   const access = requireRole(session, ["owner", "admin", "editor"]);
@@ -37,7 +37,7 @@ export async function GET(
     return fail("NO_WORKSPACE", "Join or create a workspace first.", 409);
   }
 
-  const parsedPlatform = platformSchema.safeParse((await params).platform);
+  const parsedPlatform = platformSchema.safeParse((await params).id);
 
   if (!parsedPlatform.success) {
     return fail("INVALID_PLATFORM", "Unsupported platform.", 400);

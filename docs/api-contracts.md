@@ -20,7 +20,11 @@
   - Responses include `capabilityWarnings` when adapter-level warnings are produced for selected targets.
 - `POST /api/posts/:id/publish-now`
 - `POST /api/posts/:id/schedule`
+- `POST /api/posts/:id/cancel`
+- `POST /api/posts/:id/run-worker`
+- `POST /api/posts/:id/retry-failed`
 - `GET /api/posts/:id/status`
+- `GET /api/posts/:id/timeline?limit=`
 - `GET /api/posts?status=&platform=&dateRange=`
 
 ## Internal

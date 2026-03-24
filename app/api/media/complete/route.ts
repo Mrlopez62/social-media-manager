@@ -4,6 +4,8 @@ import { completeMediaUploadSchema } from "@/lib/api/schemas";
 import { authErrorToStatus, getSessionContext, requireRole } from "@/lib/auth/session";
 import { completeMediaAssetUpload, CompleteMediaUploadError } from "@/lib/media/complete-upload";
 import { getMediaBucketName } from "@/lib/media/storage";
+import { emitTelemetry } from "@/lib/observability/telemetry";
+import { enforceRateLimit, rateLimitPolicies } from "@/lib/security/rate-limit";
 import { getSupabaseServiceClient, getSupabaseUserClient } from "@/lib/supabase";
 
 export async function POST(req: Request) {
@@ -16,6 +18,15 @@ export async function POST(req: Request) {
 
   if (!session) {
     return fail("UNAUTHENTICATED", "Authentication is required.", 401);
+  }
+
+  const rateLimited = await enforceRateLimit({
+    req,
+    policy: rateLimitPolicies.mediaWrite,
+    userId: session.userId
+  });
+  if (rateLimited) {
+    return rateLimited;
   }
 
   const workspaceId = session.workspaceId;
@@ -42,13 +53,49 @@ export async function POST(req: Request) {
       serviceClient: getSupabaseServiceClient()
     });
 
+    void emitTelemetry({
+      event: "api.media.complete.succeeded",
+      level: "info",
+      message: "Media upload completion persisted.",
+      tags: {
+        workspaceId,
+        userId: session.userId,
+        mediaAssetId: result.mediaAsset.id
+      },
+      data: {
+        storagePath: result.mediaAsset.storagePath
+      }
+    });
+
     return ok(result, 201);
   } catch (error) {
     if (error instanceof CompleteMediaUploadError) {
+      void emitTelemetry({
+        event: "api.media.complete.failed",
+        level: "warning",
+        message: "Media upload completion failed.",
+        tags: {
+          workspaceId,
+          userId: session.userId,
+          errorCode: error.code
+        },
+        error
+      });
       return fail(error.code, error.message, error.status);
     }
 
     const message = error instanceof Error ? error.message : "Failed to complete media upload.";
+    void emitTelemetry({
+      event: "api.media.complete.failed",
+      level: "error",
+      message: "Media upload completion failed with unexpected error.",
+      tags: {
+        workspaceId,
+        userId: session.userId,
+        errorCode: "MEDIA_COMPLETE_FAILED"
+      },
+      error
+    });
     return fail("MEDIA_COMPLETE_FAILED", message, 500);
   }
 }

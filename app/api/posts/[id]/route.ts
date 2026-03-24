@@ -2,8 +2,10 @@ import { fail, ok } from "@/lib/api/http";
 import { patchPostSchema } from "@/lib/api/schemas";
 import { parseJsonBody } from "@/lib/api/validation";
 import { getSessionContext, requireRole } from "@/lib/auth/session";
+import { emitTelemetry } from "@/lib/observability/telemetry";
 import { DraftServiceError, updateDraftPost } from "@/lib/posts/drafts";
 import { getDraftWriteAccessFailure } from "@/lib/posts/draft-rbac";
+import { enforceRateLimit, rateLimitPolicies } from "@/lib/security/rate-limit";
 import { getSupabaseUserClient } from "@/lib/supabase";
 
 export async function PATCH(
@@ -22,10 +24,21 @@ export async function PATCH(
     return fail("UNAUTHENTICATED", "Authentication is required.", 401);
   }
 
+  const rateLimited = await enforceRateLimit({
+    req,
+    policy: rateLimitPolicies.postsWrite,
+    userId: session.userId
+  });
+  if (rateLimited) {
+    return rateLimited;
+  }
+
   const workspaceId = session.workspaceId;
   if (!workspaceId) {
     return fail("NO_WORKSPACE", "Join or create a workspace first.", 409);
   }
+
+  const postId = (await params).id;
 
   const parsed = await parseJsonBody(req, patchPostSchema);
   if (!parsed.success) {
@@ -36,10 +49,24 @@ export async function PATCH(
 
   try {
     const updated = await updateDraftPost(userClient, {
-      postId: (await params).id,
+      postId,
       workspaceId,
       actorUserId: session.userId,
       patch: parsed.data
+    });
+
+    void emitTelemetry({
+      event: "api.posts.update.succeeded",
+      level: "info",
+      message: "Draft post updated.",
+      tags: {
+        workspaceId,
+        userId: session.userId,
+        postId
+      },
+      data: {
+        targetCount: updated.targets.length
+      }
     });
 
     return ok({
@@ -61,10 +88,34 @@ export async function PATCH(
     });
   } catch (error) {
     if (error instanceof DraftServiceError) {
+      void emitTelemetry({
+        event: "api.posts.update.failed",
+        level: "warning",
+        message: "Draft post update failed.",
+        tags: {
+          workspaceId,
+          userId: session.userId,
+          postId,
+          errorCode: error.code
+        },
+        error
+      });
       return fail(error.code, error.message, error.status);
     }
 
     const message = error instanceof Error ? error.message : "Failed to update draft.";
+    void emitTelemetry({
+      event: "api.posts.update.failed",
+      level: "error",
+      message: "Draft post update failed with unexpected error.",
+      tags: {
+        workspaceId,
+        userId: session.userId,
+        postId,
+        errorCode: "POST_UPDATE_FAILED"
+      },
+      error
+    });
     return fail("POST_UPDATE_FAILED", message, 500);
   }
 }

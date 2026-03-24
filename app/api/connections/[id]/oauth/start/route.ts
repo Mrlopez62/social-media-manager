@@ -3,13 +3,15 @@ import { fail, ok } from "@/lib/api/http";
 import { platformSchema } from "@/lib/api/schemas";
 import { authErrorToStatus, getSessionContext, requireRole } from "@/lib/auth/session";
 import { buildMetaAuthorizationUrl, isMetaPlatform } from "@/lib/integrations/meta";
+import { emitTelemetry } from "@/lib/observability/telemetry";
+import { enforceRateLimit, rateLimitPolicies } from "@/lib/security/rate-limit";
 import { getSupabaseUserClient } from "@/lib/supabase";
 
 const OAUTH_STATE_TTL_MINUTES = 15;
 
 export async function POST(
-  _req: Request,
-  { params }: { params: Promise<{ platform: string }> }
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getSessionContext();
   const access = requireRole(session, ["owner", "admin", "editor"]);
@@ -22,12 +24,21 @@ export async function POST(
     return fail("UNAUTHENTICATED", "Authentication is required.", 401);
   }
 
+  const rateLimited = await enforceRateLimit({
+    req,
+    policy: rateLimitPolicies.oauthStart,
+    userId: session.userId
+  });
+  if (rateLimited) {
+    return rateLimited;
+  }
+
   const workspaceId = session.workspaceId;
   if (!workspaceId) {
     return fail("NO_WORKSPACE", "Join or create a workspace first.", 409);
   }
 
-  const parsedPlatform = platformSchema.safeParse((await params).platform);
+  const parsedPlatform = platformSchema.safeParse((await params).id);
 
   if (!parsedPlatform.success) {
     return fail("INVALID_PLATFORM", "Unsupported platform.", 400);
@@ -62,6 +73,20 @@ export async function POST(
     });
 
     if (stateError) {
+      void emitTelemetry({
+        event: "api.connections.oauth_start.failed",
+        level: "error",
+        message: "OAuth start failed while persisting state.",
+        tags: {
+          workspaceId,
+          userId: session.userId,
+          platform: parsedPlatform.data,
+          errorCode: "OAUTH_START_FAILED"
+        },
+        data: {
+          reason: stateError.message
+        }
+      });
       return fail("OAUTH_START_FAILED", stateError.message, 500);
     }
 
@@ -75,6 +100,17 @@ export async function POST(
       }
     });
 
+    void emitTelemetry({
+      event: "api.connections.oauth_start.succeeded",
+      level: "info",
+      message: "OAuth flow initialized.",
+      tags: {
+        workspaceId,
+        userId: session.userId,
+        platform: parsedPlatform.data
+      }
+    });
+
     return ok({
       workspaceId,
       platform: parsedPlatform.data,
@@ -83,6 +119,17 @@ export async function POST(
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to initialize OAuth flow.";
+    void emitTelemetry({
+      event: "api.connections.oauth_start.failed",
+      level: "error",
+      message: "OAuth start failed.",
+      tags: {
+        workspaceId,
+        userId: session.userId,
+        errorCode: "OAUTH_START_FAILED"
+      },
+      error
+    });
     return fail("OAUTH_START_FAILED", message, 500);
   }
 }

@@ -1,0 +1,67 @@
+{
+  "version": 1,
+  "channels": {
+    "ops-slack": {
+      "type": "slack",
+      "target": "#ops-alerts"
+    },
+    "security-slack": {
+      "type": "slack",
+      "target": "#security-alerts"
+    },
+    "pager": {
+      "type": "pagerduty",
+      "target": "primary-oncall"
+    }
+  },
+  "rules": [
+    {
+      "id": "critical_dead_letter_spike",
+      "severity": "critical",
+      "query": "environment:production app_event:publish.job.execute.finished finalJobStatus:dead_letter",
+      "channels": ["pager", "ops-slack"]
+    },
+    {
+      "id": "warning_publish_failures_increasing",
+      "severity": "warning",
+      "query": "environment:production app_event:publish.job.execute.finished finalJobStatus:failed",
+      "channels": ["ops-slack"]
+    },
+    {
+      "id": "critical_meta_refresh_failures",
+      "severity": "critical",
+      "query": "environment:production app_event:publish.target.failed errorCode:META_TOKEN_REFRESH_FAILED",
+      "channels": ["pager", "ops-slack"]
+    },
+    {
+      "id": "warning_meta_refresh_degradation",
+      "severity": "warning",
+      "query": "environment:production app_event:publish.target.failed errorCode:META_TOKEN_REFRESH_FAILED",
+      "channels": ["ops-slack"]
+    },
+    {
+      "id": "warning_internal_worker_failures",
+      "severity": "warning",
+      "query": "environment:production (app_event:api.internal.publish_dispatch.failed OR app_event:api.internal.publish_execute.failed)",
+      "channels": ["ops-slack"]
+    },
+    {
+      "id": "warning_rate_limit_denial_surge",
+      "severity": "warning",
+      "query": "environment:production app_event:security.rate_limit.denied",
+      "channels": ["security-slack"]
+    },
+    {
+      "id": "critical_rate_limit_denial_flood",
+      "severity": "critical",
+      "query": "environment:production app_event:security.rate_limit.denied",
+      "channels": ["pager", "security-slack"]
+    },
+    {
+      "id": "warning_oauth_start_failures",
+      "severity": "warning",
+      "query": "environment:production app_event:api.connections.oauth_start.failed",
+      "channels": ["ops-slack"]
+    }
+  ]
+}

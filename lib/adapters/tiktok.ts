@@ -8,7 +8,8 @@ import type {
 export class TikTokAdapter implements PlatformAdapter {
   readonly platform = "tiktok" as const;
 
-  validatePayload(_input: PublishInput): AdapterValidationResult {
+  validatePayload(input: PublishInput): AdapterValidationResult {
+    void input;
     return {
       valid: false,
       warnings: [],
@@ -16,13 +17,16 @@ export class TikTokAdapter implements PlatformAdapter {
     };
   }
 
-  transformPayload(_input: PublishInput): Record<string, unknown> {
+  transformPayload(input: PublishInput): Record<string, unknown> {
+    void input;
     return {
       unsupported: true
     };
   }
 
-  async publish(_connectionId: string, _input: PublishInput): Promise<PublishResult> {
+  async publish(connectionId: string, input: PublishInput): Promise<PublishResult> {
+    void connectionId;
+    void input;
     return {
       success: false,
       retryable: false,
@@ -31,7 +35,8 @@ export class TikTokAdapter implements PlatformAdapter {
     };
   }
 
-  async refreshToken(_connectionId: string) {
+  async refreshToken(connectionId: string) {
+    void connectionId;
     return {
       success: false,
       error: "TikTok connector unavailable in MVP."
