@@ -54,7 +54,8 @@ Status:
 - CI security gates now block merge on critical dependency vulnerabilities and detected secrets.
 - Security control tests added for payload guardrails and rate-limit enforcement.
 - Pre-launch checklist automation added (`npm run check:prelaunch`) for dependency pins, alert routing, and incident drill coverage.
-- Remaining: verify alert channels in production workspace and execute first live incident drill.
+- Added: strict routing-target validation command (`npm run check:prelaunch:strict-alerts`) and drill evidence scaffolding (`npm run ops:drill:init`).
+- Remaining: replace placeholder alert destinations with real production targets, verify channels in live Sentry workspace, and execute first live incident drill.
 
 ## Phase 5 (TikTok)
 - Enable TikTok adapter after app review and permission approval.

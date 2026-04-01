@@ -68,6 +68,16 @@ Expected:
 6. Validate stabilization signals.
 7. Close drill and capture follow-up actions.
 
+## Drill Evidence File
+
+Create an evidence artifact before each drill:
+
+```bash
+npm run ops:drill:init -- --scenario dead-letter-spike --environment staging --commander "Your Name"
+```
+
+This creates a timestamped file in `docs/incident-drills/` that you can fill in during the drill.
+
 ## Evidence Capture Template
 
 - Drill date/time:
