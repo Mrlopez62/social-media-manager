@@ -22,6 +22,12 @@ npm run check:prelaunch:strict-alerts
 
 This enforces that known placeholder targets in `config/alert-routing.json` are replaced.
 
+To enforce both real alert targets and completed incident drill evidence, run:
+
+```bash
+npm run check:prelaunch:strict-ops
+```
+
 ## 2. Dashboard Definition
 
 Create one Sentry dashboard named: `Social Publisher - Production Ops`

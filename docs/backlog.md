@@ -36,7 +36,7 @@
 
 ## P2
 - Add security checks (rate limits + JSON payload hardening baseline). (Done)
-- Add operational dashboards and alerts. (In Progress - Sentry query/threshold catalog documented, strict target validation + drill evidence scaffolding added)
+- Add operational dashboards and alerts. (In Progress - Sentry query/threshold catalog documented, strict target validation + strict drill evidence validation added)
 - Add CI security scan gates (dependency audit + secret scanning). (Done)
 - Add security control tests for `415`/`413` payload guards and `429` rate-limit enforcement. (Done)
 - Automate pre-launch checklist (dependency pin review, alert routing validation, incident drill runbook checks). (Done)

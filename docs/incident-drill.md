@@ -78,6 +78,18 @@ npm run ops:drill:init -- --scenario dead-letter-spike --environment staging --c
 
 This creates a timestamped file in `docs/incident-drills/` that you can fill in during the drill.
 
+Validate that at least one completed drill evidence file exists:
+
+```bash
+npm run ops:drill:validate
+```
+
+For production readiness enforcement (together with real alert routing targets), run:
+
+```bash
+npm run check:prelaunch:strict-ops
+```
+
 ## Evidence Capture Template
 
 - Drill date/time:

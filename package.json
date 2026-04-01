@@ -10,6 +10,8 @@
     "typecheck": "tsc --noEmit",
     "check:prelaunch": "node scripts/prelaunch-checklist.mjs",
     "check:prelaunch:strict-alerts": "PRELAUNCH_REQUIRE_REAL_ALERT_TARGETS=true node scripts/prelaunch-checklist.mjs",
+    "check:prelaunch:strict-ops": "PRELAUNCH_REQUIRE_REAL_ALERT_TARGETS=true PRELAUNCH_REQUIRE_DRILL_EVIDENCE=true node scripts/prelaunch-checklist.mjs",
+    "ops:drill:validate": "PRELAUNCH_REQUIRE_DRILL_EVIDENCE=true node scripts/prelaunch-checklist.mjs",
     "ops:drill:init": "node scripts/create-incident-drill-report.mjs",
     "test": "npm run test:integration",
     "test:integration": "node --test --experimental-strip-types \"tests/integration/*.test.ts\"",

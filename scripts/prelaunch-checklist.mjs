@@ -1,8 +1,9 @@
-import { readFileSync, existsSync } from "fs";
+import { readFileSync, existsSync, readdirSync } from "fs";
 import { resolve } from "path";
 
 const ROOT = process.cwd();
 const REQUIRE_REAL_ALERT_TARGETS = process.env.PRELAUNCH_REQUIRE_REAL_ALERT_TARGETS === "true";
+const REQUIRE_DRILL_EVIDENCE = process.env.PRELAUNCH_REQUIRE_DRILL_EVIDENCE === "true";
 
 function readJson(path) {
   return JSON.parse(readFileSync(resolve(ROOT, path), "utf8"));
@@ -10,6 +11,44 @@ function readJson(path) {
 
 function readText(path) {
   return readFileSync(resolve(ROOT, path), "utf8");
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function extractPrefixedLineValue(text, prefix) {
+  const pattern = new RegExp(`^${escapeRegExp(prefix)}\\s*(.*)$`, "m");
+  const match = text.match(pattern);
+  return match ? match[1].trim() : null;
+}
+
+function isBlankEvidenceValue(value) {
+  if (!value) {
+    return true;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) {
+    return true;
+  }
+
+  return normalized === "tbd" || normalized === "todo";
+}
+
+function extractSection(text, heading) {
+  const headingIndex = text.indexOf(heading);
+  if (headingIndex === -1) {
+    return "";
+  }
+
+  const sectionStart = headingIndex + heading.length;
+  const nextHeadingIndex = text.indexOf("\n## ", sectionStart);
+  if (nextHeadingIndex === -1) {
+    return text.slice(sectionStart);
+  }
+
+  return text.slice(sectionStart, nextHeadingIndex);
 }
 
 function isExactVersion(value) {
@@ -160,6 +199,92 @@ function collectIncidentDrillFailures(docText) {
   return failures;
 }
 
+const REQUIRED_INCIDENT_EVIDENCE_PREFIXES = [
+  "- Drill date/time:",
+  "- Scenario:",
+  "- Environment:",
+  "- Incident Commander:",
+  "- Scribe:",
+  "- Alerts fired (name + timestamp):",
+  "- Routing destinations verified:",
+  "- Root cause summary:",
+  "- Recovery validation:",
+  "- Time to detect:",
+  "- Time to acknowledge:",
+  "- Time to mitigate:"
+];
+
+const REQUIRED_SIGNOFF_PREFIXES = ["- Ops Responder:", "- Security Responder:", "- Incident Commander:"];
+
+function collectIncidentEvidenceFailures() {
+  const failures = [];
+  const incidentDir = resolve(ROOT, "docs/incident-drills");
+
+  if (!existsSync(incidentDir)) {
+    failures.push("docs/incident-drills directory is required when PRELAUNCH_REQUIRE_DRILL_EVIDENCE=true.");
+    return failures;
+  }
+
+  const evidenceFiles = readdirSync(incidentDir)
+    .filter((entry) => entry.toLowerCase().endsWith(".md"))
+    .filter((entry) => entry.toLowerCase() !== "readme.md");
+
+  if (evidenceFiles.length === 0) {
+    failures.push(
+      "No incident drill evidence files found in docs/incident-drills. Run `npm run ops:drill:init` and complete at least one report."
+    );
+    return failures;
+  }
+
+  let hasCompletedEvidence = false;
+  const incompleteFileReasons = [];
+
+  for (const fileName of evidenceFiles) {
+    const relativePath = `docs/incident-drills/${fileName}`;
+    const text = readText(relativePath);
+    const fileFailures = [];
+
+    for (const prefix of REQUIRED_INCIDENT_EVIDENCE_PREFIXES) {
+      const value = extractPrefixedLineValue(text, prefix);
+      if (isBlankEvidenceValue(value)) {
+        fileFailures.push(`${relativePath} missing completed value for "${prefix}"`);
+      }
+    }
+
+    const signoffSection = extractSection(text, "## Sign-off");
+    if (!signoffSection.trim()) {
+      fileFailures.push(`${relativePath} is missing a completed "## Sign-off" section.`);
+    } else {
+      for (const prefix of REQUIRED_SIGNOFF_PREFIXES) {
+        const value = extractPrefixedLineValue(signoffSection, prefix);
+        if (isBlankEvidenceValue(value)) {
+          fileFailures.push(`${relativePath} missing sign-off value for "${prefix}"`);
+        }
+      }
+    }
+
+    const followupSection = extractSection(text, "## Follow-up Actions");
+    const hasFollowupAction = /^\s*\d+\.\s+\S.+$/m.test(followupSection);
+    if (!hasFollowupAction) {
+      fileFailures.push(`${relativePath} must include at least one populated follow-up action item.`);
+    }
+
+    if (fileFailures.length === 0) {
+      hasCompletedEvidence = true;
+      break;
+    }
+
+    incompleteFileReasons.push(...fileFailures);
+  }
+
+  if (!hasCompletedEvidence) {
+    failures.push("No completed incident drill evidence file found in docs/incident-drills.");
+    failures.push(...incompleteFileReasons.slice(0, 10));
+  }
+
+  return failures;
+}
+
 function run() {
   const failures = [];
 
@@ -179,6 +304,9 @@ function run() {
     failures.push(...collectAlertRoutingTargetFailures(alertRouting));
   }
   failures.push(...collectIncidentDrillFailures(incidentDrillDoc));
+  if (REQUIRE_DRILL_EVIDENCE) {
+    failures.push(...collectIncidentEvidenceFailures());
+  }
 
   if (failures.length > 0) {
     console.error("Pre-launch checklist failed:");
@@ -197,6 +325,11 @@ function run() {
     console.log("- alert routing target verification skipped (set PRELAUNCH_REQUIRE_REAL_ALERT_TARGETS=true)");
   }
   console.log("- incident drill document verified");
+  if (REQUIRE_DRILL_EVIDENCE) {
+    console.log("- incident drill evidence verified (strict)");
+  } else {
+    console.log("- incident drill evidence verification skipped (set PRELAUNCH_REQUIRE_DRILL_EVIDENCE=true)");
+  }
 }
 
 run();

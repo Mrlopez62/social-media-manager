@@ -43,9 +43,11 @@ Current implementation baseline:
 9. Run pre-launch checklist automation:
    - `npm run check:prelaunch`
    - optional production-hardening pass: `npm run check:prelaunch:strict-alerts`
+   - full operational hardening pass (real alert targets + completed drill evidence): `npm run check:prelaunch:strict-ops`
    - review [docs/incident-drill.md](docs/incident-drill.md)
 10. Create an incident drill evidence file before each drill:
    - `npm run ops:drill:init -- --scenario dead-letter-spike --environment staging --commander "Your Name"`
+   - validate completed drill evidence: `npm run ops:drill:validate`
 
 ## API Surface
 - Auth
