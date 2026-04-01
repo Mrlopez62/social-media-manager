@@ -2,6 +2,7 @@ import { readFileSync, existsSync } from "fs";
 import { resolve } from "path";
 
 const ROOT = process.cwd();
+const REQUIRE_REAL_ALERT_TARGETS = process.env.PRELAUNCH_REQUIRE_REAL_ALERT_TARGETS === "true";
 
 function readJson(path) {
   return JSON.parse(readFileSync(resolve(ROOT, path), "utf8"));
@@ -112,6 +113,30 @@ function collectAlertRoutingFailures(alertRouting) {
   return failures;
 }
 
+const ALERT_ROUTING_PLACEHOLDERS = new Set(["#ops-alerts", "#security-alerts", "primary-oncall"]);
+
+function collectAlertRoutingTargetFailures(alertRouting) {
+  const failures = [];
+  const channels = alertRouting.channels ?? {};
+
+  for (const [channelId, channel] of Object.entries(channels)) {
+    const target = typeof channel?.target === "string" ? channel.target.trim() : "";
+
+    if (!target) {
+      failures.push(`channel "${channelId}" must define a non-empty target.`);
+      continue;
+    }
+
+    if (ALERT_ROUTING_PLACEHOLDERS.has(target)) {
+      failures.push(
+        `channel "${channelId}" target "${target}" still looks like a placeholder. Replace it with your real production destination.`
+      );
+    }
+  }
+
+  return failures;
+}
+
 const REQUIRED_INCIDENT_HEADINGS = [
   "## Objectives",
   "## Participants And Roles",
@@ -150,6 +175,9 @@ function run() {
   failures.push(...collectDependencyPinFailures(packageJson));
   failures.push(...collectLockfileFailures(packageJson, lockfile));
   failures.push(...collectAlertRoutingFailures(alertRouting));
+  if (REQUIRE_REAL_ALERT_TARGETS) {
+    failures.push(...collectAlertRoutingTargetFailures(alertRouting));
+  }
   failures.push(...collectIncidentDrillFailures(incidentDrillDoc));
 
   if (failures.length > 0) {
@@ -163,6 +191,11 @@ function run() {
   console.log("Pre-launch checklist passed:");
   console.log("- dependency pins verified");
   console.log("- alert routing config verified");
+  if (REQUIRE_REAL_ALERT_TARGETS) {
+    console.log("- alert routing targets verified (strict)");
+  } else {
+    console.log("- alert routing target verification skipped (set PRELAUNCH_REQUIRE_REAL_ALERT_TARGETS=true)");
+  }
   console.log("- incident drill document verified");
 }
 

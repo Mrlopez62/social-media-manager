@@ -10,6 +10,17 @@ Routing source of truth:
 - `SENTRY_DSN` is configured in the app runtime.
 - Telemetry events are flowing (logs + Sentry).
 - Use `environment:production` in every alert query.
+- `config/alert-routing.json` has real destinations (not placeholders) before production launch.
+
+## 1.1 Routing Target Verification
+
+Before production launch, verify real routing targets are set:
+
+```bash
+npm run check:prelaunch:strict-alerts
+```
+
+This enforces that known placeholder targets in `config/alert-routing.json` are replaced.
 
 ## 2. Dashboard Definition
 
